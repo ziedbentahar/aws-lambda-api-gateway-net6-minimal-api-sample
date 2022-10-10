@@ -11,7 +11,7 @@ env:
   APPLICATION_PACKAGE: lambdwithapigwaminimalapisample
   APPLICATION_NAME: minimal-api-sample-lambda-apigw
   LAMBDA_BUCKET_NAME: minimal-api-lambda-apigw-sample-bucket
-  SLN_WORKING_DIR: ./src/LambdaMinimalApiSample
+  SLN_WORKING_DIR: ./src/MinimalApiSample
 
 jobs:
   build:
@@ -38,7 +38,7 @@ jobs:
       
     - name: Zip artifact
       run: |
-        zip -jr ${{ env.APPLICATION_PACKAGE }}-${{ github.sha }}.zip  ./LambdaMinimalApiSample/bin/Release/net6.0/publish/*
+        zip -jr ${{ env.APPLICATION_PACKAGE }}-${{ github.sha }}.zip  ./MinimalApiSample/bin/Release/net6.0/publish/*
   
     - name: Upload build artifact
       uses: actions/upload-artifact@v3
@@ -92,7 +92,7 @@ jobs:
             Application=${{ env.APPLICATION_NAME }} \
             Environment=dev \
             LambdaName=lambda \
-            LambdaHandler=LambdaMinimalApiSample \
+            LambdaHandler=MinimalApiSample \
             LambdaBucketName=${{ env.LAMBDA_BUCKET_NAME }} \
             LambdaZipFile=${{ env.APPLICATION_PACKAGE }}-${{ github.sha }}.zip \
             --capabilities CAPABILITY_IAM
