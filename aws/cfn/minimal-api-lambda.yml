@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda with Url Function Exposed with Cloudfront
+
+Parameters:
+  Application:
+    Type: String
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - stage
+      - prod
+  LambdaName:
+    Type: String
+  LambdaHandler:
+    Type: String
+  LambdaBucketName:
+    Type: String
+  LambdaZipFile:
+    Type: String
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+            
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${Application}-${Environment}-${LambdaName}
+      Code:
+        S3Bucket: !Sub ${LambdaBucketName}
+        S3Key: !Sub ${LambdaZipFile}
+      Handler: !Sub ${LambdaHandler}
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Architectures:
+        - arm64
+      Runtime: dotnet6
+      Timeout: 60
+      MemorySize: 512
+  
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Description: An Amazon API Gateway HTTP API and an AWS Lambda function.
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - HEAD
+          - OPTIONS
+          - POST
+      Target: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}/invocations
+  
+  FunctionResourcePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*'
+      FunctionName: !GetAtt LambdaFunction.Arn    
+
+  
+  
+  

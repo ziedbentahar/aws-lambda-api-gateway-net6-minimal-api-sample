@@ -1,0 +1,99 @@
+name: dotnet6 minimal api lambda sample pipeline
+
+on:
+  push:
+    branches: [ main ]
+      
+  pull_request:
+    branches: [ main ]
+
+env:
+  APPLICATION_PACKAGE: lambdwithapigwaminimalapisample
+  APPLICATION_NAME: minimal-api-sample-lambda-apigw
+  LAMBDA_BUCKET_NAME: minimal-api-lambda-apigw-sample-bucket
+  SLN_WORKING_DIR: ./src/LambdaMinimalApiSample
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ${{env.SLN_WORKING_DIR }}
+ 
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: 6.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+    - name: Publish
+      run: dotnet publish -c Release
+      
+    - name: Zip artifact
+      run: |
+        zip -jr ${{ env.APPLICATION_PACKAGE }}-${{ github.sha }}.zip  ./LambdaMinimalApiSample/bin/Release/net6.0/publish/*
+  
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ env.APPLICATION_PACKAGE }}
+        path: ${{ env.SLN_WORKING_DIR }}/${{ env.APPLICATION_PACKAGE }}-${{ github.sha }}.zip
+        
+  upload-artifact-to-s3:
+    needs: [build]
+    
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/download-artifact@v2
+      with:
+        name: ${{ env.APPLICATION_PACKAGE }}
+   
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-west-1
+
+    - name: Create or update lambda bucket
+      run: |
+        aws cloudformation deploy --template-file ./aws/cfn/lambda-bucket.yml --stack-name lambda-bucket --parameter-overrides LambdaBucketName=${{ env.LAMBDA_BUCKET_NAME}}
+        
+    - name: Upload to S3
+      run: |
+        aws s3 cp ${{ env.APPLICATION_PACKAGE }}-${{ github.sha }}.zip s3://${{ env.LAMBDA_BUCKET_NAME}}
+
+  deploy:
+    needs: [upload-artifact-to-s3]
+    
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3 
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-west-1
+
+    - name: Deploy lambda
+      run: |
+        aws cloudformation deploy --template-file ./aws/cfn/minimal-api-lambda.yml --stack-name minimal-api-lambda-sample --parameter-overrides \
+            Application=${{ env.APPLICATION_NAME }} \
+            Environment=dev \
+            LambdaName=lambda \
+            LambdaHandler=LambdaMinimalApiSample \
+            LambdaBucketName=${{ env.LAMBDA_BUCKET_NAME }} \
+            LambdaZipFile=${{ env.APPLICATION_PACKAGE }}-${{ github.sha }}.zip \
+            --capabilities CAPABILITY_IAM
+           
