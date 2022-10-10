@@ -42,6 +42,8 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: arn:aws:logs:*:*:*
+
+                
             
   LambdaFunction:
     Type: AWS::Lambda::Function
@@ -57,10 +59,12 @@ Resources:
       Runtime: dotnet6
       Timeout: 60
       MemorySize: 512
+
   
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
+      Name: !Sub ${Application}-${Environment}-apigw
       Description: An Amazon API Gateway HTTP API and an AWS Lambda function.
       ProtocolType: HTTP
       CorsConfiguration:

@@ -88,7 +88,7 @@ jobs:
 
     - name: Deploy lambda
       run: |
-        aws cloudformation deploy --template-file ./aws/cfn/minimal-api-lambda.yml --stack-name minimal-api-lambda-sample --parameter-overrides \
+        aws cloudformation deploy --template-file ./aws/cfn/minimal-api-lambda.yml --stack-name minimal-api-lambda-apigw-sample --parameter-overrides \
             Application=${{ env.APPLICATION_NAME }} \
             Environment=dev \
             LambdaName=lambda \
